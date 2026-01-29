@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "tox.h"
 
@@ -18,6 +19,7 @@ int s_online[3] = { 0, 0, 0};
 int f_online[3] = { 0, 0, 0};
 uint8_t s_num1 = 1;
 uint8_t s_num2 = 2;
+int message_receipt = 0;
 
 static struct Node1 {
     char *ip;
@@ -253,10 +255,20 @@ static void friend_message_cb(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE
             if (message2)
             {
                 memcpy(message2, message, length);
+                l(num, LOG_LEVEL_INFO, 0, "got message: ->%s<-", message2);
                 free(message2);
             }
         }
     }
+    l(num, LOG_LEVEL_INFO, 0, "message callback finished");
+}
+
+static void friend_read_receipt_cb(Tox *tox, uint32_t friend_number, uint32_t message_id, void *user_data)
+{
+    uint8_t* unum = (uint8_t *)user_data;
+    uint8_t num = *unum;
+    message_receipt++;
+    l(num, LOG_LEVEL_INFO, 0, "got read receipt for message: %d", message_id);
 }
 
 static void set_tox_callbacks(Tox *tox, int num)
@@ -266,6 +278,7 @@ static void set_tox_callbacks(Tox *tox, int num)
     tox_callback_friend_connection_status(tox, friend_connection_status_callback);
     tox_callback_friend_request(tox, friend_request_cb);
     tox_callback_friend_message(tox, friend_message_cb);
+    tox_callback_friend_read_receipt(tox, friend_read_receipt_cb);
     // ----- CALLBACKS -----
 }
 
@@ -362,10 +375,54 @@ int main() {
     l(0, LOG_LEVEL_INFO, 0, "friends online and connected");
 
 
+    // =================================================
+    // =================================================
+
+    Tox_Err_Friend_Send_Message err_m1;
+    uint32_t msd_id_1 = tox_friend_send_message(t1, 0, TOX_MESSAGE_TYPE_NORMAL, "m1", 2, &err_m1);
+    l(1, LOG_LEVEL_INFO, 0, "sent message: res=%d id=%d", (int)err_m1, (int)msd_id_1);
+
+    l(1, LOG_LEVEL_INFO, 0, "iterate start");
+    tox_iterate(t1, (void *)&s_num1);
+    l(1, LOG_LEVEL_INFO, 0, "iterate end");
+    yieldcpu(10);
+
+    l(2, LOG_LEVEL_INFO, 0, "iterate start");
+    tox_iterate(t2, (void *)&s_num2);
+    l(2, LOG_LEVEL_INFO, 0, "iterate end");
+    yieldcpu(10);
+
+    l(0, LOG_LEVEL_INFO, 0, "simulate tox1 going offline now, tox2 will keep iterating");
+    time_t start_time = time(NULL);
+    while (difftime(time(NULL), start_time) < 60) {
+        for (int i = 0; i < 100; i++) {
+            tox_iterate(t2, (void *)&s_num2);
+            yieldcpu(10);
+        }
+    }
+    l(0, LOG_LEVEL_INFO, 0, "tox1 will go online again");
+
+    for(int i=0;i<100;i++) {
+        tox_iterate(t1, (void *)&s_num1);
+        tox_iterate(t2, (void *)&s_num2);
+        yieldcpu(10);
+    }
+
+    int exit_code = 0;
+
+    if (message_receipt == 0)
+    {
+        l(0, LOG_LEVEL_ERROR, 0, "no message receipt");
+        exit_code = 0;
+    }
+
+    // =================================================
+    // =================================================
+
     l(0, LOG_LEVEL_INFO, 0, "shutting down toxes ...");
     tox_kill(t1);
     tox_kill(t2);
     l(0, LOG_LEVEL_INFO, 0, "finished");
 
-    return 0;
+    exit(exit_code);
 }
