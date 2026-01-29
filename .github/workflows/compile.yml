@@ -1,0 +1,26 @@
+name: run_tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+
+  test_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: install deps
+        run: |
+          sudo apt-get update && \
+          sudo DEBIAN_FRONTEND=noninteractive \
+          apt-get install -y --no-install-recommends \
+          ca-certificates \
+          coreutils autoconf libtool pkg-config \
+          libsodium-dev libcurl4-gnutls-dev
+
+      - name: tests
+        run: |
+          ./harness.sh
+
