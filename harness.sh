@@ -19,18 +19,18 @@ pwd
 mkdir -p "$rundir"/
 cd "$rundir"/ || exit 1
 
-# git clone "$repo_url"
+git clone "$repo_url"
 cd "$repo_name""/"
 
-# git checkout "$repo_commit"
+git checkout "$repo_commit"
 
-# rm -Rf third_party/cmp
-# git submodule update --init --recursive
+rm -Rf third_party/cmp
+git submodule update --init --recursive
 
-# ./autogen.sh
-# ./configure --disable-av || exit 1
+./autogen.sh
+./configure --disable-av || exit 1
 
-# make -j10 || exit 1
+make -j10 || exit 1
 
 
 ls -al build/.libs/libtox*.a || exit 1
