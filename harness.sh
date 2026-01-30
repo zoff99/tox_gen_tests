@@ -6,6 +6,11 @@ repo_commit="master"
 
 rundir="_run"
 
+fast=0
+if [ "$1""x" == "fastx" ]; then
+    fast=1
+fi
+
 _HOME2_=$(dirname "$0")
 export _HOME2_
 _HOME_=$(cd "$_HOME2_" || exit;pwd)
@@ -19,19 +24,21 @@ pwd
 mkdir -p "$rundir"/
 cd "$rundir"/ || exit 1
 
-git clone "$repo_url"
+if [ "$fast" == "0" ]; then
+    git clone "$repo_url"
+fi
+
 cd "$repo_name""/"
 
-git checkout "$repo_commit"
+if [ "$fast" == "0" ]; then
+    git checkout "$repo_commit"
+    rm -Rf third_party/cmp
+    git submodule update --init --recursive
 
-rm -Rf third_party/cmp
-git submodule update --init --recursive
-
-./autogen.sh
-./configure --disable-av || exit 1
-
-make -j10 || exit 1
-
+    ./autogen.sh
+    ./configure --disable-av || exit 1
+    make -j10 || exit 1
+fi
 
 ls -al build/.libs/libtox*.a || exit 1
 
