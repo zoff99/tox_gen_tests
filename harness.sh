@@ -50,7 +50,10 @@ INCDIR="$_HOME_"/"$rundir"/c-toxcore/toxcore/
 LIBDIR="$_HOME_"/"$rundir"/c-toxcore/build/.libs/
 
 for i in $(ls -1 *.c) ; do
+    echo ""
+    echo "=========================================="
     echo "$i"
+    echo ""
     gcc -g -O0 -fsanitize=address "$i" -I"$INCDIR" "$LIBDIR"/libtoxcore.a "$LIBDIR"/libtoxencryptsave.a -fPIC -Wl,-Bstatic $(pkg-config --cflags --libs libsodium) -Wl,-Bdynamic -pthread -o "${i%.c}" && ./"${i%.c}"
 done
 
