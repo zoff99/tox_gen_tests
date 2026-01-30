@@ -291,7 +291,7 @@ static void save_message_to_db(int number, const char* message)
     if (message_receipt > 0)
     {
         l(number, LOG_LEVEL_INFO, 1, "friend got read receipt, but we did not yet save the message into the db");
-        l(number, LOG_LEVEL_ERROR, 1, "now the user stops the application, or it crashes here");
+        l(number, LOG_LEVEL_ERROR, 1, "now the user stops the application, or it crashes here and the message is lost");
         exit_code = 1;
     }
     else
