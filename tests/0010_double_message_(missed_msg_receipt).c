@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "tox.h"
 
@@ -20,6 +21,11 @@ int f_online[3] = { 0, 0, 0};
 uint8_t s_num1 = 1;
 uint8_t s_num2 = 2;
 int message_receipt = 0;
+
+static struct timeval start_tv;
+static int first_call = 1;
+
+int exit_code = 0;
 
 static struct Node1 {
     char *ip;
@@ -91,6 +97,35 @@ void l(int num, LogLevel log_level, int message_level, const char *format, ...) 
 
     // Print 'num' with fixed width at start
     printf("[%-2d]", num);
+
+    if (first_call) {
+        gettimeofday(&start_tv, NULL);
+        first_call = 0;
+    }
+
+    struct timeval current_tv;
+    gettimeofday(&current_tv, NULL);
+
+    // Calculate elapsed time
+    long elapsed_sec = current_tv.tv_sec - start_tv.tv_sec;
+    long elapsed_usec = current_tv.tv_usec - start_tv.tv_usec;
+
+    if (elapsed_usec < 0) {
+        elapsed_usec += 1000000;
+        elapsed_sec -= 1;
+    }
+
+    int milliseconds = (int)(elapsed_usec / 1000);
+    int hours = (int)(elapsed_sec / 3600);
+    int minutes = (int)((elapsed_sec % 3600) / 60);
+    int seconds = (int)(elapsed_sec % 60);
+
+    char time_str[20];
+    snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d.%03d",
+             hours, minutes, seconds, milliseconds);
+    // Print timestamp column
+    printf(" [%s] ", time_str);
+
     // Print log_level
     printf(" [%*s] ", 5, logLevelToString(log_level));
 
@@ -110,21 +145,26 @@ static void yieldcpu(uint32_t ms)
     usleep(1000 * ms);
 }
 
-// Structure to pass the function pointer
+// Define the function pointer type with two parameters
+typedef void (*func_with_params_t)(int, const char*);
+
+// Structure to pass to thread
 typedef struct {
-    void (*func)(void);
+    func_with_params_t func;
+    int param1;
+    const char* param2;
 } thread_data_t;
 
 // Wrapper function for pthread
 void* thread_wrapper(void* arg) {
     thread_data_t* data = (thread_data_t*)arg;
-    data->func();
+    data->func(data->param1, data->param2);
     free(data); // Free the allocated memory
     return NULL;
 }
 
-// Function to start a background thread with a custom code piece
-void run_in_background(void (*func)(void)) {
+// Function to start a background thread with a function that takes two parameters
+void run_in_background(func_with_params_t func, int param1, const char* param2) {
     pthread_t thread_id;
     thread_data_t* data = malloc(sizeof(thread_data_t));
     if (data == NULL) {
@@ -132,6 +172,9 @@ void run_in_background(void (*func)(void)) {
         exit(EXIT_FAILURE);
     }
     data->func = func;
+    data->param1 = param1;
+    data->param2 = param2;
+
     int result = pthread_create(&thread_id, NULL, thread_wrapper, data);
     if (result != 0) {
         l(0, LOG_LEVEL_ERROR, 1, "pthread_create failed: %s", strerror(result));
@@ -296,9 +339,6 @@ int main() {
     set_tox_callbacks(t2, 2);
     l(0, LOG_LEVEL_INFO, 0, "created toxes");
 
-    // l(100, LOG_LEVEL_INFO, 0, "Main thread starting background task.");
-    // run_in_background(my_code_piece);
-
     f_online[1] = 0;
     f_online[2] = 0;
     s_online[1] = 0;
@@ -407,8 +447,6 @@ int main() {
         tox_iterate(t2, (void *)&s_num2);
         yieldcpu(10);
     }
-
-    int exit_code = 0;
 
     if (message_receipt == 0)
     {
